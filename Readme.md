@@ -54,7 +54,7 @@ or edit /etc/krb5.conf to be like that:
 
 Backup smb.conf
 ```
-mv /etc/samba/smb.conf /etc/samba/smb.conf.bkp
+# mv /etc/samba/smb.conf /etc/samba/smb.conf.bkp
 ```
 Provisioning:
 ```
