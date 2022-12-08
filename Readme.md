@@ -1,10 +1,10 @@
 # samba4
 >It's an Active Directory alternative
-[samba4 wiki][samba4-doc]
-[Requirements][samba4-req]
+* [samba4 wiki][samba4-doc]
+* [Requirements][samba4-req]
 
 ## Instalation
-- Check for [file system support][sanba4-fss]
+- Check for [file system support][samba4-fss]
 - install operating system
 - Choose a domain name
 - Add to /etc/hosts
