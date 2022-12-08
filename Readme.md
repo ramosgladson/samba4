@@ -67,6 +67,15 @@ or
 ```
 reboot and have fun
 
+## Using the script samba.sh
+```
+$ git clone https://github.com:ramosgladson/samba4.git
+$ cd samba4
+$ sudo chmod +x samba.sh
+$ ./samba.sh
+
+```
+
 <!-- Mardown Links -->
 [samba4-doc]: https://wiki.samba.org/index.php/Main_Page
 [samba4-req]: https://wiki.samba.org/index.php/Operating_System_Requirements
