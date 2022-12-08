@@ -41,6 +41,9 @@ install(){
     sleep 1
     key
     sudo samba-tool domain provision --use-rfc2307 --interactive
+    echo "Finish, rebooting"
+    key
+    sudo reboot
 }
 
 
