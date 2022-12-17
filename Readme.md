@@ -69,7 +69,7 @@ reboot and have fun
 
 ## Using the script samba.sh
 ```
-$ git clone https://github.com:ramosgladson/samba4.git
+$ git clone https://github.com/ramosgladson/samba4.git
 $ cd samba4
 $ sudo chmod +x samba.sh
 $ ./samba.sh
