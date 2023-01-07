@@ -30,7 +30,10 @@ install(){
     libpopt-dev libreadline-dev nettle-dev perl perl-modules-5.30 pkg-config \
     python-all-dev python-crypto python2-dbg python-dev-is-python2 python-dnspython \
     python3-dnspython python3-gpg python-markdown python3-markdown \
-    python3-dev xsltproc zlib1g-dev liblmdb-dev lmdb-utils
+    python3-dev xsltproc zlib1g-dev liblmdb-dev lmdb-utils acl attr \
+    samba samba-dsdb-modules samba-vfs-modules winbind krb5-config \
+    krb5-user dnsutils
+
 
 
     line
