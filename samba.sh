@@ -26,8 +26,8 @@ install(){
     libacl1-dev libaio-dev libarchive-dev libattr1-dev libblkid-dev libbsd-dev \
     libcap-dev libcups2-dev libgnutls28-dev libgpgme-dev libjson-perl libldap2-dev \
     libncurses5-dev libpam0g-dev libparse-yapp-perl libpopt-dev libreadline-dev \
-    nettle-dev perl perl-modules pkg-config   python-all-dev python-crypto python-dbg \
-    python-dev python-dnspython   python3-dnspython python-gpg python3-gpg \
+    nettle-dev perl perl-modules-5.30 pkg-config  python-all-dev python-crypto python2-dbg \
+    python-dev-is-python2 python-dnspython python3-dnspython python-gpg python3-gpg \
     python-markdown python3-markdown python3-dev xsltproc zlib1g-dev liblmdb-dev \
     lmdb-utils acl attr samba samba-dsdb-modules samba-vfs-modules winbind krb5-config \
     krb5-user dnsutils
