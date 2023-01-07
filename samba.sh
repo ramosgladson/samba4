@@ -21,6 +21,7 @@ install(){
 
     line
 
+
     sudo apt-get install acl attr autoconf bind9utils bison build-essential \
     debhelper dnsutils docbook-xml docbook-xsl flex gdb libjansson-dev krb5-user \
     libacl1-dev libaio-dev libarchive-dev libattr1-dev libblkid-dev libbsd-dev \
@@ -31,7 +32,7 @@ install(){
     python-markdown python3-markdown python3-dev xsltproc zlib1g-dev liblmdb-dev \
     lmdb-utils acl attr samba samba-dsdb-modules samba-vfs-modules winbind krb5-config \
     krb5-user dnsutils
-
+    
     line
     echo "Preparing the installation"
     sudo mv /etc/samba/smb.conf /etc/samba/smb.conf.bkp
