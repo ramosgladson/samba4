@@ -22,7 +22,7 @@ nettle-dev perl perl-modules pkg-config   python-all-dev python-crypto python-db
 python-dev python-dnspython   python3-dnspython python-gpg python3-gpg \
 python-markdown python3-markdown python3-dev xsltproc zlib1g-dev liblmdb-dev \
 lmdb-utils acl attr samba samba-dsdb-modules samba-vfs-modules winbind krb5-config \
-krb5-user dnsutils
+krb5-user dnsutils smbclient
 ```
 Set realm ALL CAPS
 ![][realm]
@@ -65,6 +65,70 @@ or
 # samba-tool domain provision --use-rfc2307 --realm=MY.LOCAL.DOMAIN --domain=my \
 --server-role=dc --dns-backend=SAMBA_INTERNAL --adminpass=P@ssw0rd
 ```
+
+## Add min protocol = NT1
+```
+add this lines at /etc/samba/smb.conf
+        server min protocol = NT1
+        client min protocol = NT1
+	
+like this:
+
+# Global parameters
+[global]
+	dns forwarder = 192.168.0.1
+	netbios name = AD1
+	realm = MY.LOCAL
+	server role = active directory domain controller
+	workgroup = MY
+	idmap_ldb:use rfc2307 = yes
+        server min protocol = NT1
+        client min protocol = NT1
+
+
+
+[sysvol]
+	path = /var/lib/samba/sysvol
+	read only = No
+
+[netlogon]
+	path = /var/lib/samba/sysvol/my.local/scripts
+	read only = No
+
+
+```
+
+## Samba-ad-dc service
+```
+# systemctl unmask samba-ad-dc
+# systemctl enable samba-ad-dc
+# systemctl restart samba-ad-dc
+```
+* Change name server at /etc/resolv.conf to your local host ip
+* add your host ip at /etc/hosts
+
+## Create a reverse zone
+```
+# samba-tool dns zonecreate <Your-AD-DNS-Server-IP-or-hostname> 0.99.10.in-addr.arpa -U Administrator
+Password for [administrator@SAMDOM.EXAMPLE.COM]:
+Zone 0.99.10.in-addr.arpa created successfully
+```
+
+```
+# samba
+```
+
+## Testing
+```
+# smbclient -L localhost -U Administrator
+# smbclient //localhost/netlogon -UAdministrator -c 'ls'
+# dig -t srv _ldap.tcp.my.local
+# dig -t srv _kerberos.tcp.my.local
+# dig -t a ad1.my.local
+# kinit Administrator
+```
+
+
 reboot and have fun
 
 ## Using the script samba.sh
