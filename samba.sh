@@ -61,19 +61,19 @@ install(){
     echo "Fill up realm ALL CAPS"
     key
     
-    sudo samba-tool domain provision --use-rfc2307 --interactive > /dev/null 2>&1
+    sudo samba-tool domain provision --use-rfc2307 --interactive
 
     ACTION="Samba unmask"
     sudo systemctl unmask samba-ad-dc > /dev/null 2>&1
     check_errors
     
 
-    ACTION="Samba unmask"
+    ACTION="Samba enable"
     sudo systemctl enable samba-ad-dc > /dev/null 2>&1
     check_errors
     
     
-    ACTION="Samba unmask"
+    ACTION="Samba restart"
     sudo systemctl restart samba-ad-dc > /dev/null 2>&1
     check_errors
     
