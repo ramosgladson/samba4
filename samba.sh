@@ -61,9 +61,7 @@ install(){
     echo "Fill up realm ALL CAPS"
     key
     
-    ACTION="Setting domain controller"
     sudo samba-tool domain provision --use-rfc2307 --interactive > /dev/null 2>&1
-    check_errors
 
     ACTION="Samba unmask"
     sudo systemctl unmask samba-ad-dc > /dev/null 2>&1
