@@ -49,7 +49,7 @@ install(){
     python3-dnspython python3-gpg python-markdown python3-markdown \
     python3-dev xsltproc zlib1g-dev liblmdb-dev lmdb-utils acl attr \
     samba samba-dsdb-modules samba-vfs-modules winbind krb5-config \
-    krb5-user dnsutils smbclient > /dev/null 2>&1
+    krb5-user dnsutils smbclient -y > /dev/null 2>&1
     check_errors
 
     line
