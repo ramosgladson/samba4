@@ -38,7 +38,6 @@ install(){
 
     line
 
-    ACTION="Installing packages"
     sudo apt-get install acl attr autoconf bind9utils bison build-essential \
     debhelper dnsutils docbook-xml docbook-xsl flex gdb libjansson-dev krb5-user \
     libacl1-dev libaio-dev libarchive-dev libattr1-dev libblkid-dev libbsd-dev \
@@ -49,8 +48,7 @@ install(){
     python3-dnspython python3-gpg python-markdown python3-markdown \
     python3-dev xsltproc zlib1g-dev liblmdb-dev lmdb-utils acl attr \
     samba samba-dsdb-modules samba-vfs-modules winbind krb5-config \
-    krb5-user dnsutils smbclient -y > /dev/null 2>&1
-    check_errors
+    krb5-user dnsutils smbclient -y
 
     line
 
