@@ -83,18 +83,13 @@ install(){
     read REVERSE_ZONE
     echo "Type your realm please"
     read REALM
+    echo "Creating reverse zone"
+    samba-tool dns zonecreate $AD_DC_IP $REVERSE_ZONE.in.addr.arpa -U Administrator
+    echo "Testing smbclient" 
+    smbclient -L localhost -U Administrator
 
-    ACTION="Reverse zone"
-    samba-tool dns zonecreate $AD_DC_IP $REVERSE_ZONE.in.addr.arpa -U Administrator > /dev/null 2>&1
-    check_errors
-    
-    ACTION="Smbclient test"
-    smbclient -L localhost -U Administrator > /dev/null 2>&1
-    check_errors
-
-    ACTION="Netlogon ls"
-    smbclient //localhost/netlogon -UAdministrator -c 'ls' > /dev/null 2>&1
-    check_errors
+    echo "Netlogon ls"
+    smbclient //localhost/netlogon -UAdministrator -c 'ls'
 
     ACTION="LDAP test"
     dig -t srv _ldap.tcp.$REALM > /dev/null 2>&1
@@ -104,9 +99,8 @@ install(){
     dig -t srv _kerberos.tcp.$REALM > /dev/null 2>&1
     check_errors
 
-    ACTION="Kinit test"
-    kinit Administrator > /dev/null 2>&1
-    check_errors
+    echo "Kinit test"
+    kinit Administrator
 
     echo "Finished, rebooting"
     key
