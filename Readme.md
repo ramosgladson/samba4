@@ -107,6 +107,14 @@ like this:
 * Change name server at /etc/resolv.conf to your local host ip
 * add your host ip at /etc/hosts
 
+## Resolv.conf
+/etc/resolv.conf
+nameserver 127.0.0.53
+options edns0 trust-ad
+search my.local.domain
+
+## Change dns to your machine ip
+
 ## Create a reverse zone
 ```
 # samba-tool dns zonecreate <Your-AD-DNS-Server-IP-or-hostname> 0.99.10.in-addr.arpa -U Administrator
@@ -133,11 +141,11 @@ reboot and have fun
 
 ## Using the script samba.sh
 ```
-$ git clone https://github.com/ramosgladson/samba4.git
-$ cd samba4
-$ sudo chmod +x samba.sh
-$ ./samba.sh
-
+# git clone https://github.com/ramosgladson/samba4.git
+# cd samba4
+# ./samba.sh
+(change resolv.conf and dns)
+# ./samba2.sh
 ```
 
 <!-- Mardown Links -->
