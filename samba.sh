@@ -84,11 +84,11 @@ install(){
 }
 
 
-if [ $(lsb_release -sr) == "20.04" ];
+if [ $(lsb_release -si) == "Debian" && $(lsb_release -sr) == "10" ];
 then
     install
 else
-    echo "This script was made to run on linux ubuntu 20.04 and your version is: "
+    echo "This script was made to run on linux debian 10 and your version is: "
     echo "$(lsb_release -sd)"
     echo "Proced any way? [y/N]"
     read answer
