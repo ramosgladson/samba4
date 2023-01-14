@@ -84,7 +84,7 @@ install(){
 }
 
 
-if [ $(lsb_release -si) == "Debian" && $(lsb_release -sr) == "10" ];
+if [ $(lsb_release -si) == "Debian" ] && [ $(lsb_release -sr) == "10" ];
 then
     install
 else
