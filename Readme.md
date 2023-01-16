@@ -10,7 +10,7 @@
 - Add to /etc/hosts
 - Install [packages][samba4-pac]
 
-Ubuntu 20.04 example:
+Debian 10 example:
 
 ```
 # apt-get install acl attr autoconf bind9utils bison build-essential \
@@ -67,38 +67,6 @@ or
 --server-role=dc --dns-backend=SAMBA_INTERNAL --adminpass=P@ssw0rd
 ```
 
-## Add min protocol = NT1
-```
-add this lines at /etc/samba/smb.conf
-        server min protocol = NT1
-        client min protocol = NT1
-	
-like this:
-
-# Global parameters
-[global]
-	dns forwarder = 192.168.0.1
-	netbios name = AD1
-	realm = MY.LOCAL
-	server role = active directory domain controller
-	workgroup = MY
-	idmap_ldb:use rfc2307 = yes
-        server min protocol = NT1
-        client min protocol = NT1
-
-
-
-[sysvol]
-	path = /var/lib/samba/sysvol
-	read only = No
-
-[netlogon]
-	path = /var/lib/samba/sysvol/my.local/scripts
-	read only = No
-
-
-```
-
 ## Samba-ad-dc service
 ```
 # systemctl unmask samba-ad-dc
@@ -110,22 +78,17 @@ like this:
 
 ## Resolv.conf
 /etc/resolv.conf
-nameserver 127.0.0.53
-options edns0 trust-ad
+nameserver 192.168.0.11 //server ip
 search my.local.domain
 
-## Change dns to your machine ip
 
 ## Create a reverse zone
 ```
-# samba-tool dns zonecreate <Your-AD-DNS-Server-IP-or-hostname> 0.99.10.in-addr.arpa -U Administrator
+# samba-tool dns zonecreate <Your-AD-DNS-Server-IP-or-hostname> 0.168.192.in-addr.arpa -U Administrator
 Password for [administrator@SAMDOM.EXAMPLE.COM]:
-Zone 0.99.10.in-addr.arpa created successfully
+Zone 0.168.192.in-addr.arpa created successfully
 ```
 
-```
-# samba
-```
 
 ## Testing
 ```
