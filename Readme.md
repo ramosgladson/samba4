@@ -108,7 +108,7 @@ reboot and have fun
 # git clone https://github.com/ramosgladson/samba4.git
 # cd samba4
 # ./samba.sh
-(change resolv.conf and dns)
+(change resolv.conf nameserver)
 # ./samba2.sh
 ```
 
