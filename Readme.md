@@ -78,9 +78,10 @@ or
 
 ## Resolv.conf
 /etc/resolv.conf
+```
 nameserver 192.168.0.11 //server ip
 search my.local.domain
-
+```
 
 ## Create a reverse zone
 ```
