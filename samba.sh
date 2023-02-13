@@ -1,14 +1,72 @@
 #!/bin/bash
 
 ############################################################################
-#title           :samba4-script
-#description     :This script will prepair samba4 domain controller
-#author		 :Gladson Carneiro Ramos
-#date            :2023-01-08
-#version         :0.2
-#usage		 :bash samba4.sh
+#title           :sambar SCRIPT
+#description     :Thir SCRIPT will prepair samba4 domain controller
+#author		     :Gladson Carneiro Ramos
+#date            :2023-02-12
+#version         :1.0
+#usage		     :bash samba4.sh
 ############################################################################
 
+build_sh(){
+cat << EOF > build.sh
+#!/bin/bash
+
+./configure --prefix /usr --enable-fhs --enable-cups --sysconfdir=/etc --localstatedir=/var \
+--with-privatedir=/var/lib/samba/private --with-piddir=/var/run/samba --with-automount \
+--datadir=/usr/share --with-lockdir=/var/run/samba --with-statedir=/var/lib/samba  \
+--with-cachedir=/var/cache/samba --with-systemd
+
+make -j $(nproc)
+make install
+ldconfig
+EOF
+}
+
+service(){
+cat << EOF > samba-ad-dc.service
+[Unit]
+Description=Samba Active Directory Domain Controller
+After=network.target remote-fs.target nss-lookup.target
+
+[Service]
+Type=forking
+ExecStart=/usr/local/samba/sbin/samba -D
+PIDFile=/usr/local/samba/var/run/samba.pid
+ExecReload=/bin/kill -HUP $MAINPID
+
+[Install]
+WantedBy=multi-user.target
+EOF
+}
+
+prepare(){
+    echo "What is your dc name?"
+    read NAME
+    hostnamectl set-hostname $NAME
+    ip a s
+    echo "What is your ip address?"
+    read IP    
+    echo "What is your domain (my.domain.com)"
+    read MYDOMAIN
+    mv /etc/resolv.conf /etc/resolv.conf.bkp
+    echo "nameserver $IP" >> /etc/resolv.conf
+    echo "search $MYDOMAIN" >> /etc/resolv.conf
+    echo "$IP $NAME.$MYDOMAIN $NAME" >> /etc/hosts
+}
+
+yes_or_no () {
+
+    case $1 in
+        [yY][eE][sS]|[yY])            
+            return 1
+            ;;
+        *)
+            return 0
+            ;;
+    esac
+}
 line(){
     echo "-------------------------------------------------------------------------------------"
 }
@@ -27,74 +85,252 @@ check_errors() {
 	fi
 }
 
+start(){
+    echo "Would you like to install dependencies?"
+    read ANSWER
+    yes_or_no $ANSWER
+    if [[ "$?" = '1' ]]; then
+        install_dependencies
+    else
+        echo "Are you sure?"
+        read ANSWER
+        yes_or_no $ANSWER
+        if [[ "$?" = '1' ]]; then
+            echo "ok"
+        else
+            install_dependencies
+        fi
+    fi
+}
 
+install_dependencies(){
+    if [ -e _dependencies/bootstrap_generated-dists_${DISTROVERSION}_bootstrap.sh ]; then
+        ./_dependencies/bootstrap_generated-dists_${DISTROVERSION}_bootstrap.sh
+    else
+        echo "There is no dependencies script for your distro/version (${DISTROVERSION})"
+        echo "What would you like to do?"
+        SCRIPTS=$(ls _dependencies | cut -d"_" -f3)  
+        i=0
+        for SCRIPT in $SCRIPTS  
+        do  
+        ((i++))
+        echo $i "- Install" $SCRIPT "dependencies" 
+        done
+        echo $(ls -l _dependencies | awk '{print $9}' | cut -d"_" -f3 | wc -l) "- Inform dependencies / abort scritp" 
+        echo -n "Option: "
+        read OPT
+        i=0
+        for SCRIPT in $SCRIPTS  
+        do  
+        ((i++))
+            if [[ $OPT = $i ]]; then
+                DISTROVERSION=$SCRIPT                
+                install_dependencies
+            else
+                echo "Would you like to abort script?"
+                read ANSWER
+                yes_or_no $ANSWER
+                if [[ "$?" = '1' ]]; then
+                    exit
+                fi
+                echo "Please inform packages now:"
+                read DEPENDENCIES
+                case $DISTRO in 
+                    Ubuntu)
+                        apt update -y && apt upgrade -y
+                        apt install $DEPENDENCIES
+                        ;;
+                    Debian)
+                        apt update -y && apt upgrade -y
+                        apt install $DEPENDENCIES
+                        ;;
+                    Centos)
+                        yum update -y && yum upgrade -y
+                        yum install $DEPENDENCIES
+                        ;; 
+                    *)
+                        echo "Type your distro install command please:"
+                        read COMMANDO
+                        $COMMANDO $DEPENDENCIES
+                        ;;
+                esac
+            fi
+        done
+    fi                          
+}
 
-install(){
-    echo "Installing samba..."
-    echo "Fill up nex window your realm ALL CAPS [MY.LOCAL.DOMAIN]"
-    echo "Next fill kerberos servers, normal letter [ad1.mylocal.domain ad2.my.local.domain]"
-    echo "After, kerberos adm, normal as well [ad1.my.local.domain]."
-    key
+package_or_build(){
+    echo -n "How would you like to install?
+    1 - Build
+    2 - Package 
+    Option: "
+    read OPT
+    case $OPT in
+        1)
+            build
+            ;;
+        2)
+            package
+            ;;
+        *)
+            echo "Option not found"
+            package_or_build
+            ;;
+    esac
 
-    line
+}
 
-    sudo apt-get install acl attr autoconf bind9utils bison build-essential \
-    debhelper dnsutils docbook-xml docbook-xsl flex gdb libjansson-dev krb5-user \
-    libacl1-dev libaio-dev libarchive-dev libattr1-dev libblkid-dev libbsd-dev \
-    libcap-dev libcups2-dev libgnutls28-dev libgpgme-dev libjson-perl libldap2-dev \
-    libncurses5-dev libpam0g-dev libparse-yapp-perl libpopt-dev libreadline-dev \
-    nettle-dev perl perl-modules pkg-config   python-all-dev python-crypto python-dbg \
-    python-dev python-dnspython   python3-dnspython python-gpg python3-gpg \
-    python-markdown python3-markdown python3-dev xsltproc zlib1g-dev liblmdb-dev \
-    lmdb-utils acl attr samba samba-dsdb-modules samba-vfs-modules winbind krb5-config \
-    krb5-user dnsutils smbclient -y
+build(){     
 
-    line
+   
+    if [[ $DISTRO = 'Ubuntu' ]]; then 
+        case $VERSION in
+            18.04)
+                wget https://download.samba.org/pub/samba/stable/samba-4.17.5.tar.gz
+                ;;
+            
+            20.04)
+                wget https://download.samba.org/pub/samba/stable/samba-4.17.5.tar.gz
+                ;;                    
+            *)
+                echo "Distro/version not found, witch samba version would you like to install (entire name please)?"
+                curl https://download.samba.org/pub/samba/stable/ | grep tar.gz | awk '{print $8}' | cut -d'"' -f2 | grep samba-4.1
+                read SAMBA
+                wget https://download.samba.org/pub/samba/stable/${SAMBA}
+                ;;
+            
+        esac
 
-    ACTION="Preparing the installation"
-    sudo mv /etc/samba/smb.conf /etc/samba/smb.conf.bkp > /dev/null 2>&1
-    check_errors
+    elif [[ $DISTRO = 'Debian' ]]; then
+        case $VERSION in
+            10)
+                wget https://download.samba.org/pub/samba/stable/samba-4.15.13.tar.gz
+                ;;
+            
+            11)
+                wget https://download.samba.org/pub/samba/stable/samba-4.17.5.tar.gz
+                ;;
+            *)
+                echo "Distro/version not found, witch samba version would you like to install (entire name please)?"
+                curl https://download.samba.org/pub/samba/stable/ | grep tar.gz | awk '{print $8}' | cut -d'"' -f2 | grep samba-4.1
+                read SAMBA
+                wget https://download.samba.org/pub/samba/stable/${SAMBA}
+                ;;
+        esac
 
-    sleep 1
-    
-    echo "Fill up realm ALL CAPS"
-    key
-    
-    sudo samba-tool domain provision --use-rfc2307 --interactive
+    elif [[ $DISTRO = 'Centos' ]]; then
+        case $VERSION in
+            7)
+                wget https://download.samba.org/pub/samba/stable/samba-4.17.5.tar.gz
+                ;;
+            
+            8)
+                wget https://download.samba.org/pub/samba/stable/samba-4.15.13.tar.gz
+                ;;
+            *)
+                echo "Distro/version not found, witch samba version would you like to install (entire name please)?"
+                curl https://download.samba.org/pub/samba/stable/ | grep tar.gz | awk '{print $8}' | cut -d'"' -f2 | grep samba-4.1
+                read SAMBA
+                wget https://download.samba.org/pub/samba/stable/${SAMBA}
+                ;;
+        esac        
+    else
+        echo "Distro/version not found, witch samba version would you like to install (entire name please)?"
+        curl https://download.samba.org/pub/samba/stable/ | grep tar.gz | awk '{print $8}' | cut -d'"' -f2 | grep samba-4.1
+        read SAMBA
+        wget https://download.samba.org/pub/samba/stable/${SAMBA}
+    fi
 
-    ACTION="Samba unmask"
-    sudo systemctl unmask samba-ad-dc > /dev/null 2>&1
-    check_errors
-    
-
-    ACTION="Samba enable"
-    sudo systemctl enable samba-ad-dc > /dev/null 2>&1
-    check_errors
-    
-    
-    ACTION="Samba restart"
-    sudo systemctl restart samba-ad-dc > /dev/null 2>&1
-    check_errors
-    
-    echo "Finished, rebooting"
-    key
-
-    sudo reboot
+    tar xvzf samba-*.tar.gz
+    build_sh
+    mv build.sh `ls -l | grep d | awk '{print $9}' | grep ^samba`/
+    chmod +x `ls -l | grep d | awk '{print $9}' | grep ^samba`/build.sh
+    echo "run ./build.sh and exit"    
+    cd `ls -l | grep d | awk '{print $9}' | grep ^samba`
+    $SHELL
+        
 }
 
 
-if [ $(lsb_release -si) == "Debian" ] && [ $(lsb_release -sr) == "10" ];
-then
-    install
+
+package(){
+    case $DISTRO in
+        Ubuntu)
+            apt-get install acl attr samba samba-dsdb-modules samba-vfs-modules winbind libpam-winbind libnss-winbind krb5-config krb5-user dnsutils
+            ;;
+        Debian)
+            apt-get install acl attr samba samba-dsdb-modules samba-vfs-modules winbind libpam-winbind libnss-winbind krb5-config krb5-user dnsutils
+            ;;
+        openSUSE)
+            zypper install samba samba-winbind samba-ad-dc
+            ;;
+        *)
+            echo "Would you like to install freeBSD samba-ad packages?"
+            read ANSWER
+            yes_or_no $ANSWER
+            if [[ "$?" = '1' ]]; then
+                pkg install net/samba44
+            else
+                echo "Red Hat does not provide packages for running Samba as an AD DC. As an alternative build samba-ad"
+                build
+            fi
+            ;;
+    esac
+   
+}
+
+
+#beginning
+
+
+DISTRO=$(lsb_release -si)
+VERSION=$(lsb_release -sr)
+DISTROVERSION=${DISTRO}${VERSION}
+
+start
+package_or_build
+
+
+#ACTION="Preparing the installation"
+#sudo mv /etc/samba/smb.conf /etc/samba/smb.conf.bkp > /dev/null 2>&1
+#check_errors
+
+service
+mv samba-ad-dc.service /lib/systemd/system/
+ln -s /lib/systemd/system/samba-ad-dc.service /etc/systemd/systemd/samba-ad-dc.service
+
+echo "Fill up realm ALL CAPS"
+key    
+sudo samba-tool domain provision --use-rfc2307 --interactive
+
+ACTION= "Coping krb5.conf"
+cp /var/lib/samba/private/krb5.conf /etc/krb5.conf > /dev/null 2>&1
+check_errors
+
+ACTION="Daemon reload"
+systemctl daemon-reload > /dev/null 2>&1
+check_errors
+
+ACTION="Samba unmask"
+sudo systemctl unmask samba-ad-dc > /dev/null 2>&1
+check_errors
+
+
+ACTION="Samba enable"
+sudo systemctl enable samba-ad-dc > /dev/null 2>&1
+check_errors
+
+echo "Have you prepared hosts, hostname and resolv.conf?"
+read ANSWER
+yes_or_no $ANSWER
+if [[ "$?" = '1' ]]; then
+    echo "ok"
 else
-    echo "This script was made to run on linux debian 10 and your version is: "
-    echo "$(lsb_release -sd)"
-    echo "Proced any way? [y/N]"
-    read answer
-    if [ $answer == "y" ];
-    then
-        install
-    else
-        echo "ok, bye"
-    fi
+    prepare
 fi
+
+echo "Finished, rebooting, run samba2.sh after reboot"
+echo "bye"
+key
+
+sudo reboot
