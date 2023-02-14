@@ -3,10 +3,10 @@
 ############################################################################
 #title           :sambar SCRIPT
 #description     :Thir SCRIPT will prepair samba4 domain controller
-#author		     :Gladson Carneiro Ramos
+#author	 	 :Gladson Carneiro Ramos
 #date            :2023-02-12
-#version         :1.0
-#usage		     :bash samba4.sh
+#version         :1.1
+#usage		 :bash samba4.sh
 ############################################################################
 
 build_sh(){
@@ -45,9 +45,7 @@ prepare(){
     echo "What is your dc name?"
     read NAME
     hostnamectl set-hostname $NAME
-    ip a s
-    echo "What is your ip address?"
-    read IP    
+    IP=`ip -4 addr show scope global | grep inet | awk '{print $2}' | cut -d / -f 1`  
     echo "What is your domain (my.domain.com)"
     read MYDOMAIN
     mv /etc/resolv.conf /etc/resolv.conf.bkp
