@@ -101,6 +101,68 @@ start(){
     fi
 }
 
+
+----------------
+
+list_dependency_scripts() {
+  echo "What would you like to do?"
+  SCRIPTS=$(ls _dependencies | cut -d"_" -f3)
+  i=0
+  for SCRIPT in $SCRIPTS; do
+    ((i++))
+    echo "$i - Install $SCRIPT dependencies"
+  done
+  echo "$((i + 1)) - Inform dependencies / abort script"
+}
+
+install_dist_dependency() {
+  local dep_script="_dependencies/bootstrap_generated-dists_${DISTROVERSION}_bootstrap.sh"
+  if [ -e "$dep_script" ]; then
+    ./"$dep_script"
+  else
+    echo "There is no dependencies script for your distro/version (${DISTROVERSION})"
+    list_dependency_scripts
+    echo -n "Option: "
+    read OPT
+    if [ "$OPT" -eq "$((i + 1))" ]; then
+      echo "Please inform packages now:"
+      read DEPENDENCIES
+      case $DISTRO in
+        Ubuntu|Debian)
+          apt update -y && apt upgrade -y
+          apt install $DEPENDENCIES
+          ;;
+        Centos)
+          yum update -y && yum upgrade -y
+          yum install $DEPENDENCIES
+          ;;
+        *)
+          echo "Type your distro install command please:"
+          read COMMANDO
+          $COMMANDO $DEPENDENCIES
+          ;;
+      esac
+    else
+      DISTROVERSION="${SCRIPTS[OPT-1]}"
+      install_dist_dependency
+    fi
+  fi
+}
+
+install_dependencies() {
+  install_dist_dependency || {
+    echo "Failed to install dependencies."
+    exit 1
+  }
+}
+
+
+
+
+
+
+----------------
+
 install_dependencies(){
     if [ -e _dependencies/bootstrap_generated-dists_${DISTROVERSION}_bootstrap.sh ]; then
         ./_dependencies/bootstrap_generated-dists_${DISTROVERSION}_bootstrap.sh
@@ -295,7 +357,7 @@ package_or_build
 
 service
 mv samba-ad-dc.service /lib/systemd/system/
-ln -s /lib/systemd/system/samba-ad-dc.service /etc/systemd/systemd/samba-ad-dc.service
+ln -s /lib/systemd/system/samba-ad-dc.service /etc/systemd/system/samba-ad-dc.service
 
 echo "Fill up realm ALL CAPS"
 key    
