@@ -289,7 +289,7 @@ package(){
 
 DISTRO=$(lsb_release -si)
 VERSION=$(lsb_release -sr)
-DISTROVERSION=${DISTRO}${VERSION}
+DISTROVERSION=`echo $DISTRO$VERSION | sed 's/\.//g' | tr [:upper:] [:lower:]`
 
 start
 package_or_build
