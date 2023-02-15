@@ -101,68 +101,6 @@ start(){
     fi
 }
 
-
-----------------
-
-list_dependency_scripts() {
-  echo "What would you like to do?"
-  SCRIPTS=$(ls _dependencies | cut -d"_" -f3)
-  i=0
-  for SCRIPT in $SCRIPTS; do
-    ((i++))
-    echo "$i - Install $SCRIPT dependencies"
-  done
-  echo "$((i + 1)) - Inform dependencies / abort script"
-}
-
-install_dist_dependency() {
-  local dep_script="_dependencies/bootstrap_generated-dists_${DISTROVERSION}_bootstrap.sh"
-  if [ -e "$dep_script" ]; then
-    ./"$dep_script"
-  else
-    echo "There is no dependencies script for your distro/version (${DISTROVERSION})"
-    list_dependency_scripts
-    echo -n "Option: "
-    read OPT
-    if [ "$OPT" -eq "$((i + 1))" ]; then
-      echo "Please inform packages now:"
-      read DEPENDENCIES
-      case $DISTRO in
-        Ubuntu|Debian)
-          apt update -y && apt upgrade -y
-          apt install $DEPENDENCIES
-          ;;
-        Centos)
-          yum update -y && yum upgrade -y
-          yum install $DEPENDENCIES
-          ;;
-        *)
-          echo "Type your distro install command please:"
-          read COMMANDO
-          $COMMANDO $DEPENDENCIES
-          ;;
-      esac
-    else
-      DISTROVERSION="${SCRIPTS[OPT-1]}"
-      install_dist_dependency
-    fi
-  fi
-}
-
-install_dependencies() {
-  install_dist_dependency || {
-    echo "Failed to install dependencies."
-    exit 1
-  }
-}
-
-
-
-
-
-
-----------------
-
 install_dependencies(){
     if [ -e _dependencies/bootstrap_generated-dists_${DISTROVERSION}_bootstrap.sh ]; then
         ./_dependencies/bootstrap_generated-dists_${DISTROVERSION}_bootstrap.sh
@@ -180,42 +118,48 @@ install_dependencies(){
         echo -n "Option: "
         read OPT
         i=0
+        valid=true
         for SCRIPT in $SCRIPTS  
         do  
         ((i++))
             if [[ $OPT = $i ]]; then
                 DISTROVERSION=$SCRIPT                
                 install_dependencies
+            valid=true
             else
-                echo "Would you like to abort script?"
-                read ANSWER
-                yes_or_no $ANSWER
-                if [[ "$?" = '1' ]]; then
-                    exit
-                fi
-                echo "Please inform packages now:"
-                read DEPENDENCIES
-                case $DISTRO in 
-                    Ubuntu)
-                        apt update -y && apt upgrade -y
-                        apt install $DEPENDENCIES
-                        ;;
-                    Debian)
-                        apt update -y && apt upgrade -y
-                        apt install $DEPENDENCIES
-                        ;;
-                    Centos)
-                        yum update -y && yum upgrade -y
-                        yum install $DEPENDENCIES
-                        ;; 
-                    *)
-                        echo "Type your distro install command please:"
-                        read COMMANDO
-                        $COMMANDO $DEPENDENCIES
-                        ;;
-                esac
+            valid=false
             fi
         done
+        if [valid = "false"]; then
+            echo "Would you like to abort script?"
+            read ANSWER
+            yes_or_no $ANSWER
+            if [[ "$?" = '1' ]]; then
+                exit
+            fi
+            echo "Please inform packages now:"
+            read DEPENDENCIES
+            case $DISTRO in 
+                Ubuntu)
+                    apt update -y && apt upgrade -y
+                    apt install $DEPENDENCIES
+                    ;;
+                Debian)
+                    apt update -y && apt upgrade -y
+                    apt install $DEPENDENCIES
+                    ;;
+                Centos)
+                    yum update -y && yum upgrade -y
+                    yum install $DEPENDENCIES
+                    ;; 
+                *)
+                    echo "Type your distro install command please:"
+                    read COMMANDO
+                    $COMMANDO $DEPENDENCIES
+                    ;;
+            esac
+        fi    
+        
     fi                          
 }
 
