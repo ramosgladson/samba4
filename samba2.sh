@@ -12,33 +12,45 @@ check_errors() {
 		echo "[OK] - $ACTION"
 	fi
 }
+    
+    
+ #   echo "Testing smbclient" 
+ #   smbclient -L localhost -U Administrator
 
-    echo "Type your ip please"
-    read AD_DC_IP
-    echo "Type reverse zone please (e.g ip=192.168.0.99 reverse_zone=0.168.192) "
-    read REVERSE_ZONE
-    echo "Type your realm please"
-    read REALM
-    echo "Creating reverse zone"
-    samba-tool dns zonecreate $AD_DC_IP $REVERSE_ZONE.in.addr.arpa -U Administrator
-    echo "Testing smbclient" 
-    smbclient -L localhost -U Administrator
+ #   echo "Netlogon ls"
+ #   smbclient //localhost/netlogon -UAdministrator -c 'ls'
+#ACTION="Samba unmask"
+#systemctl unmask samba-ad-dc > /dev/null 2>&1
+#check_errors
 
-    echo "Netlogon ls"
-    smbclient //localhost/netlogon -UAdministrator -c 'ls'
+#ACTION="Samba enable"
+#systemctl enable samba-ad-dc > /dev/null 2>&1
+#check_errors
 
-    ACTION="LDAP test"
-    dig -t srv _ldap.tcp.$REALM > /dev/null 2>&1
-    check_errors
+#ACTION="Samba restart"
+#systemctl restart samba-ad-dc > /dev/null 2>&1
+#check_errors
 
-    ACTION="Kerberos test"
-    dig -t srv _kerberos.tcp.$REALM > /dev/null 2>&1
-    check_errors
+AD_DC_IP=`ip -4 addr show scope global | grep inet | awk '{print $2}' | cut -d / -f 1`
+IFS='.' read -r -a ADDR <<< "$IP"
+REVERSE_ZONE=`echo "${ADDR[2]}"."${ADDR[1]}"."${ADDR[0]}"`
+echo "Type your realm please"
+read REALM
+echo "Creating reverse zone"
+samba-tool dns zonecreate $AD_DC_IP $REVERSE_ZONE.in.addr.arpa -U Administrator
 
-    echo "Kinit test"
-    kinit Administrator
+ACTION="LDAP test"
+dig -t srv _ldap.tcp.$REALM > /dev/null 2>&1
+check_errors
 
-    echo "Finished, rebooting"
-    key
+ACTION="Kerberos test"
+dig -t srv _kerberos.tcp.$REALM > /dev/null 2>&1
+check_errors
 
-    sudo reboot
+#echo "Kinit test"
+#kinit Administrator
+
+echo "Finished, rebooting"
+key
+
+reboot

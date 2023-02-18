@@ -18,6 +18,8 @@ cat << EOF > build.sh
 --datadir=/usr/share --with-lockdir=/var/run/samba --with-statedir=/var/lib/samba  \
 --with-cachedir=/var/cache/samba --with-systemd
 
+export PATH=$PATH:/usr/sbin/
+
 make -j $(nproc)
 make install
 ldconfig
@@ -32,8 +34,8 @@ After=network.target remote-fs.target nss-lookup.target
 
 [Service]
 Type=forking
-ExecStart=/usr/local/samba/sbin/samba -D
-PIDFile=/usr/local/samba/var/run/samba.pid
+ExecStart=/usr/sbin/samba -D
+PIDFile=/run/samba/samba.pid
 ExecReload=/bin/kill -HUP $MAINPID
 
 [Install]
@@ -42,9 +44,7 @@ EOF
 }
 
 prepare(){
-    echo "What is your dc name?"
-    read NAME
-    hostnamectl set-hostname $NAME
+    
     IP=`ip -4 addr show scope global | grep inet | awk '{print $2}' | cut -d / -f 1`  
     echo "What is your domain (my.domain.com)"
     read MYDOMAIN
@@ -140,15 +140,15 @@ install_dependencies(){
             echo "Please inform packages now:"
             read DEPENDENCIES
             case $DISTRO in 
-                Ubuntu)
+                ubuntu)
                     apt update -y && apt upgrade -y
                     apt install $DEPENDENCIES
                     ;;
-                Debian)
+                debian)
                     apt update -y && apt upgrade -y
                     apt install $DEPENDENCIES
                     ;;
-                Centos)
+                centos)
                     yum update -y && yum upgrade -y
                     yum install $DEPENDENCIES
                     ;; 
@@ -187,25 +187,25 @@ package_or_build(){
 build(){     
 
    
-    if [[ $DISTRO = 'Ubuntu' ]]; then 
+    if [[ $DISTRO = 'ubuntu' ]]; then 
         case $VERSION in
-            18.04)
+            1804)
                 wget https://download.samba.org/pub/samba/stable/samba-4.17.5.tar.gz
                 ;;
             
-            20.04)
+            2004)
                 wget https://download.samba.org/pub/samba/stable/samba-4.17.5.tar.gz
                 ;;                    
             *)
                 echo "Distro/version not found, witch samba version would you like to install (entire name please)?"
                 curl https://download.samba.org/pub/samba/stable/ | grep tar.gz | awk '{print $8}' | cut -d'"' -f2 | grep samba-4.1
                 read SAMBA
-                wget https://download.samba.org/pub/samba/stable/${SAMBA}
+                wget https://download.samba.org/pub/samba/stable/$SAMBA
                 ;;
             
         esac
 
-    elif [[ $DISTRO = 'Debian' ]]; then
+    elif [[ $DISTRO = 'debian' ]]; then
         case $VERSION in
             10)
                 wget https://download.samba.org/pub/samba/stable/samba-4.15.13.tar.gz
@@ -222,7 +222,7 @@ build(){
                 ;;
         esac
 
-    elif [[ $DISTRO = 'Centos' ]]; then
+    elif [[ $DISTRO = 'centos' ]]; then
         case $VERSION in
             7)
                 wget https://download.samba.org/pub/samba/stable/samba-4.17.5.tar.gz
@@ -249,9 +249,43 @@ build(){
     build_sh
     mv build.sh `ls -l | grep d | awk '{print $9}' | grep ^samba`/
     chmod +x `ls -l | grep d | awk '{print $9}' | grep ^samba`/build.sh
-    echo "run ./build.sh and exit"    
+    echo "run ./build.sh && exit"    
     cd `ls -l | grep d | awk '{print $9}' | grep ^samba`
     $SHELL
+
+    echo "Fill up realm ALL CAPS"
+    key    
+    samba-tool domain provision --use-rfc2307 --interactive
+
+    ACTION="Coping krb5.conf"
+    cp /var/lib/samba/private/krb5.conf /etc/krb5.conf > /dev/null 2>&1
+    check_errors
+
+    service
+    mv samba-ad-dc.service /lib/systemd/system/
+    #ln -s /lib/systemd/system/samba-ad-dc.service /etc/systemd/system/samba-ad-dc.service
+
+    ACTION="Daemon reload"
+    systemctl daemon-reload > /dev/null 2>&1
+    check_errors
+
+    ACTION="Samba unmask"
+    systemctl unmask samba-ad-dc > /dev/null 2>&1
+    check_errors
+
+
+    ACTION="Samba enable"
+    systemctl enable samba-ad-dc > /dev/null 2>&1
+    check_errors
+
+    echo "Have you prepared hosts, hostname and resolv.conf?"
+    read ANSWER
+    yes_or_no $ANSWER
+    if [[ "$?" = '1' ]]; then
+        echo "ok"
+    else
+        prepare
+    fi
         
 }
 
@@ -259,14 +293,14 @@ build(){
 
 package(){
     case $DISTRO in
-        Ubuntu)
-            apt-get install acl attr samba samba-dsdb-modules samba-vfs-modules winbind libpam-winbind libnss-winbind krb5-config krb5-user dnsutils
+        ubuntu)
+            apt-get install -y acl attr samba samba-dsdb-modules samba-vfs-modules winbind libpam-winbind libnss-winbind krb5-config krb5-user dnsutils
             ;;
-        Debian)
-            apt-get install acl attr samba samba-dsdb-modules samba-vfs-modules winbind libpam-winbind libnss-winbind krb5-config krb5-user dnsutils
+        debian)
+            apt-get install -y acl attr samba samba-dsdb-modules samba-vfs-modules winbind libpam-winbind libnss-winbind krb5-config krb5-user dnsutils
             ;;
-        openSUSE)
-            zypper install samba samba-winbind samba-ad-dc
+        opensuse)
+            zypper install -y samba samba-winbind samba-ad-dc
             ;;
         *)
             echo "Would you like to install freeBSD samba-ad packages?"
@@ -280,61 +314,77 @@ package(){
             fi
             ;;
     esac
-   
+
+    ACTION="Preparing the installation"
+    mv /etc/samba/smb.conf /etc/samba/smb.conf.bkp > /dev/null 2>&1
+    check_errors
+
+    echo "Fill up realm ALL CAPS"
+    key    
+    samba-tool domain provision --use-rfc2307 --interactive
+
+    ACTION="Coping krb5.conf"
+    cp /var/lib/samba/private/krb5.conf /etc/krb5.conf > /dev/null 2>&1
+    check_errors
+
+    ACTION="Daemon reload"
+    systemctl daemon-reload > /dev/null 2>&1
+    check_errors
+
+    ACTION="Samba unmask"
+    systemctl unmask samba-ad-dc > /dev/null 2>&1
+    check_errors
+
+    ACTION="Samba enable"
+    systemctl enable samba-ad-dc > /dev/null 2>&1
+    check_errors
+
+#    systemctl restart samba-ad-dc
+
+    echo "Have you prepared hosts, hostname and resolv.conf?"
+    read ANSWER
+    yes_or_no $ANSWER
+    if [[ "$?" = '1' ]]; then
+        echo "ok"
+    else
+        prepare
+    fi
+
+
 }
 
 
 #beginning
 
+yum install redhat-lsb-core &> /dev/null 
+export LANG=en_US.UTF8
+export LC_ALL=en_US.UTF8
 
-DISTRO=$(lsb_release -si)
-VERSION=$(lsb_release -sr)
-DISTROVERSION=`echo $DISTRO$VERSION | sed 's/\.//g' | tr [:upper:] [:lower:]`
+DISTRO=$(lsb_release -si | tr [:upper:] [:lower:])
+VERSION=$(lsb_release -sr | sed 's/\.//g')
+DISTROVERSION=$DISTRO$VERSION
+
+echo "What is your dc name?"
+read NAME
+hostnamectl set-hostname $NAME
 
 start
 package_or_build
 
 
-#ACTION="Preparing the installation"
-#sudo mv /etc/samba/smb.conf /etc/samba/smb.conf.bkp > /dev/null 2>&1
-#check_errors
-
-service
-mv samba-ad-dc.service /lib/systemd/system/
-ln -s /lib/systemd/system/samba-ad-dc.service /etc/systemd/system/samba-ad-dc.service
-
-echo "Fill up realm ALL CAPS"
-key    
-sudo samba-tool domain provision --use-rfc2307 --interactive
-
-ACTION= "Coping krb5.conf"
-cp /var/lib/samba/private/krb5.conf /etc/krb5.conf > /dev/null 2>&1
-check_errors
-
-ACTION="Daemon reload"
-systemctl daemon-reload > /dev/null 2>&1
-check_errors
-
-ACTION="Samba unmask"
-sudo systemctl unmask samba-ad-dc > /dev/null 2>&1
-check_errors
 
 
-ACTION="Samba enable"
-sudo systemctl enable samba-ad-dc > /dev/null 2>&1
-check_errors
+#service
+#mv samba-ad-dc.service /lib/systemd/system/
+#ln -s /lib/systemd/system/samba-ad-dc.service /etc/systemd/system/samba-ad-dc.service
 
-echo "Have you prepared hosts, hostname and resolv.conf?"
-read ANSWER
-yes_or_no $ANSWER
-if [[ "$?" = '1' ]]; then
-    echo "ok"
-else
-    prepare
-fi
+#echo "Fill up realm ALL CAPS"
+#key    
+#samba-tool domain provision --use-rfc2307 --interactive
+
 
 echo "Finished, rebooting, run samba2.sh after reboot"
 echo "bye"
 key
 
-sudo reboot
+reboot
