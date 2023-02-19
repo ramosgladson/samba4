@@ -46,12 +46,11 @@ EOF
 prepare(){
     
     IP=`ip -4 addr show scope global | grep inet | awk '{print $2}' | cut -d / -f 1`  
-    echo "What is your domain (my.domain.com)"
-    read MYDOMAIN
-    mv /etc/resolv.conf /etc/resolv.conf.bkp
-    echo "nameserver $IP" >> /etc/resolv.conf
-    echo "search $MYDOMAIN" >> /etc/resolv.conf
-    echo "$IP $NAME.$MYDOMAIN $NAME" >> /etc/hosts
+    echo "What is your realm (my.domain.com)"
+    read REALM
+    systemd-resolve --interface `ip -4 addr show scope global | grep -i broadcast | awk '{print $2}' | sed 's/://'
+` --set-dns $IP --set-domain $REALM
+    echo "$IP $NAME.$REALM $NAME" >> /etc/hosts
 }
 
 yes_or_no () {
@@ -253,7 +252,7 @@ build(){
     cd `ls -l | grep d | awk '{print $9}' | grep ^samba`
     $SHELL
 
-    echo "Fill up realm ALL CAPS"
+    echo "Fill up realm UPPERCASE"
     key    
     samba-tool domain provision --use-rfc2307 --interactive
 
@@ -278,15 +277,7 @@ build(){
     systemctl enable samba-ad-dc > /dev/null 2>&1
     check_errors
 
-    echo "Have you prepared hosts, hostname and resolv.conf?"
-    read ANSWER
-    yes_or_no $ANSWER
-    if [[ "$?" = '1' ]]; then
-        echo "ok"
-    else
-        prepare
-    fi
-        
+    
 }
 
 
@@ -319,7 +310,7 @@ package(){
     mv /etc/samba/smb.conf /etc/samba/smb.conf.bkp > /dev/null 2>&1
     check_errors
 
-    echo "Fill up realm ALL CAPS"
+    echo "Fill up realm UPPERCASE"
     key    
     samba-tool domain provision --use-rfc2307 --interactive
 
@@ -338,17 +329,6 @@ package(){
     ACTION="Samba enable"
     systemctl enable samba-ad-dc > /dev/null 2>&1
     check_errors
-
-#    systemctl restart samba-ad-dc
-
-    echo "Have you prepared hosts, hostname and resolv.conf?"
-    read ANSWER
-    yes_or_no $ANSWER
-    if [[ "$?" = '1' ]]; then
-        echo "ok"
-    else
-        prepare
-    fi
 
 
 }
@@ -371,17 +351,14 @@ hostnamectl set-hostname $NAME
 start
 package_or_build
 
-
-
-
-#service
-#mv samba-ad-dc.service /lib/systemd/system/
-#ln -s /lib/systemd/system/samba-ad-dc.service /etc/systemd/system/samba-ad-dc.service
-
-#echo "Fill up realm ALL CAPS"
-#key    
-#samba-tool domain provision --use-rfc2307 --interactive
-
+echo "Would you like to update hosts, hostname and resolv.conf now?"
+read ANSWER
+yes_or_no $ANSWER
+if [[ "$?" = '0' ]]; then
+    echo "ok"
+else
+    prepare
+fi
 
 echo "Finished, rebooting, run samba2.sh after reboot"
 echo "bye"
