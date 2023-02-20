@@ -1,17 +1,18 @@
 #!/bin/bash
 
 ############################################################################
-#title           :sambar SCRIPT
-#description     :Thir SCRIPT will prepair samba4 domain controller
-#author	 	 :Gladson Carneiro Ramos
-#date            :2023-02-12
-#version         :1.1
-#usage		 :bash samba4.sh
+#title          :samba SCRIPT
+#description    :Thir SCRIPT will prepair samba4 domain controller
+#author         :Gladson Carneiro Ramos
+#date           :2023-02-20
+#version        :2.0
+#usage          :bash samba.sh
 ############################################################################
 
 build_sh(){
 cat << EOF > build.sh
 #!/bin/bash
+cd "${0%/*}"
 
 ./configure --prefix /usr --enable-fhs --enable-cups --sysconfdir=/etc --localstatedir=/var \
 --with-privatedir=/var/lib/samba/private --with-piddir=/var/run/samba --with-automount \
@@ -45,16 +46,35 @@ EOF
 
 prepare(){
     
-    IP=`ip -4 addr show scope global | grep inet | awk '{print $2}' | cut -d / -f 1`  
-    echo "What is your realm (my.domain.com)"
+    IP=`ip -4 addr show scope global | grep inet | awk '{print $2}' | cut -d / -f 1`
+    INTERFACE=`ip -4 addr show scope global | grep -i broadcast | awk '{print $2}' | sed 's/://'` 
+    echo "What is your realm (lowercase)"
     read REALM
-    systemd-resolve --interface `ip -4 addr show scope global | grep -i broadcast | awk '{print $2}' | sed 's/://'
-` --set-dns $IP --set-domain $REALM
+    if [ $DISTRO = "ubuntu" ] || [ $DISTRO = "debian" ]
+    then
+        systemctl unmask systemd-resolved
+        systemctl enable systemd-resolved        
+        systemctl restart systemd-resolved
+
+        ACTION="Updating /etc/resolv.conf"
+        systemd-resolve --interface $INTERFACE --set-dns $IP --set-domain $REALM &> /dev/null
+        check_errors
+    else
+        ACTION="Updating nameserver"
+        nmcli con mod $INTERFACE IPv4.dns $IP &> /dev/null
+        check_errors
+
+        ACTION="Updating search domain"
+        nmcli con mod $INTERFACE IPv4.dns-search $REALM &> /dev/null
+        check_errors
+
+        nmcli con down $INTERFACE && nmcli con up $INTERFACE
+    fi
     echo "$IP $NAME.$REALM $NAME" >> /etc/hosts
 }
 
-yes_or_no () {
 
+yes_or_no () {
     case $1 in
         [yY][eE][sS]|[yY])            
             return 1
@@ -74,7 +94,8 @@ key(){
 }
 
 check_errors() {
-	if [ $? -ne 0 ] ; then
+	if [ $? -ne 0 ]
+    then
 		echo "[FAIL] - $ACTION"
 		exit
 	else
@@ -86,13 +107,15 @@ start(){
     echo "Would you like to install dependencies?"
     read ANSWER
     yes_or_no $ANSWER
-    if [[ "$?" = '1' ]]; then
+    if [ "$?" = '1' ]
+    then
         install_dependencies
     else
         echo "Are you sure?"
         read ANSWER
         yes_or_no $ANSWER
-        if [[ "$?" = '1' ]]; then
+        if [ "$?" = '1' ]
+        then
             echo "ok"
         else
             install_dependencies
@@ -101,7 +124,8 @@ start(){
 }
 
 install_dependencies(){
-    if [ -e _dependencies/bootstrap_generated-dists_${DISTROVERSION}_bootstrap.sh ]; then
+    if [ -e _dependencies/bootstrap_generated-dists_${DISTROVERSION}_bootstrap.sh ]
+    then
         ./_dependencies/bootstrap_generated-dists_${DISTROVERSION}_bootstrap.sh
     else
         echo "There is no dependencies script for your distro/version (${DISTROVERSION})"
@@ -110,8 +134,8 @@ install_dependencies(){
         i=0
         for SCRIPT in $SCRIPTS  
         do  
-        ((i++))
-        echo $i "- Install" $SCRIPT "dependencies" 
+            ((i++))
+            echo $i "- Install" $SCRIPT "dependencies" 
         done
         echo $(ls -l _dependencies | awk '{print $9}' | cut -d"_" -f3 | wc -l) "- Inform dependencies / abort scritp" 
         echo -n "Option: "
@@ -120,20 +144,24 @@ install_dependencies(){
         valid=true
         for SCRIPT in $SCRIPTS  
         do  
-        ((i++))
-            if [[ $OPT = $i ]]; then
+            ((i++))
+            if [ $OPT = $i ]
+            then
                 DISTROVERSION=$SCRIPT                
                 install_dependencies
-            valid=true
+                valid=true
             else
-            valid=false
+                valid="false"
             fi
         done
-        if [valid = "false"]; then
+        if [ valid = "false" ]
+        then
             echo "Would you like to abort script?"
+            echo "Yes to abort. No to install packages"
             read ANSWER
             yes_or_no $ANSWER
-            if [[ "$?" = '1' ]]; then
+            if [ "$?" = '1' ]
+            then
                 exit
             fi
             echo "Please inform packages now:"
@@ -183,10 +211,10 @@ package_or_build(){
 
 }
 
-build(){     
-
-   
-    if [[ $DISTRO = 'ubuntu' ]]; then 
+build(){
+    if [ $DISTRO = 'ubuntu' ]
+    then
+        apt install -y wget 2> /dev/null 
         case $VERSION in
             1804)
                 wget https://download.samba.org/pub/samba/stable/samba-4.17.5.tar.gz
@@ -196,15 +224,16 @@ build(){
                 wget https://download.samba.org/pub/samba/stable/samba-4.17.5.tar.gz
                 ;;                    
             *)
-                echo "Distro/version not found, witch samba version would you like to install (entire name please)?"
                 curl https://download.samba.org/pub/samba/stable/ | grep tar.gz | awk '{print $8}' | cut -d'"' -f2 | grep samba-4.1
+                echo "Your distro/version has not samba version homologated, witch samba would you like to install (entire name please)?"
                 read SAMBA
                 wget https://download.samba.org/pub/samba/stable/$SAMBA
-                ;;
-            
+                ;;          
         esac
 
-    elif [[ $DISTRO = 'debian' ]]; then
+    elif [ $DISTRO = 'debian' ]
+    then
+        apt install -y wget curl 2> /dev/null
         case $VERSION in
             10)
                 wget https://download.samba.org/pub/samba/stable/samba-4.15.13.tar.gz
@@ -214,58 +243,74 @@ build(){
                 wget https://download.samba.org/pub/samba/stable/samba-4.17.5.tar.gz
                 ;;
             *)
-                echo "Distro/version not found, witch samba version would you like to install (entire name please)?"
                 curl https://download.samba.org/pub/samba/stable/ | grep tar.gz | awk '{print $8}' | cut -d'"' -f2 | grep samba-4.1
+                echo "Your distro/version has not samba version homologated, witch samba would you like to install (entire name please)?"
                 read SAMBA
                 wget https://download.samba.org/pub/samba/stable/${SAMBA}
                 ;;
         esac
 
-    elif [[ $DISTRO = 'centos' ]]; then
+    elif [ $DISTRO = 'centos' ]
+    then
+        yum install -y wget curl 2> /dev/null
         case $VERSION in
             7)
-                wget https://download.samba.org/pub/samba/stable/samba-4.17.5.tar.gz
+                wget https://download.samba.org/pub/samba/stable/samba-4.15.13.tar.gz
                 ;;
             
             8)
                 wget https://download.samba.org/pub/samba/stable/samba-4.15.13.tar.gz
                 ;;
             *)
-                echo "Distro/version not found, witch samba version would you like to install (entire name please)?"
                 curl https://download.samba.org/pub/samba/stable/ | grep tar.gz | awk '{print $8}' | cut -d'"' -f2 | grep samba-4.1
+                echo "Your distro/version has not samba version homologated, witch samba would you like to install (entire name please)?"
                 read SAMBA
                 wget https://download.samba.org/pub/samba/stable/${SAMBA}
                 ;;
         esac        
     else
-        echo "Distro/version not found, witch samba version would you like to install (entire name please)?"
+        apt install -y wget curl 2> /dev/null
+        yum install -y wget curl 2> /dev/null
+        zypper --non-interactive install wget 2> /dev/null
+        echo "This is samba versions available:"
         curl https://download.samba.org/pub/samba/stable/ | grep tar.gz | awk '{print $8}' | cut -d'"' -f2 | grep samba-4.1
+        echo "Your distro/version has not samba version homologated, witch samba would you like to install (entire name please)?"
         read SAMBA
         wget https://download.samba.org/pub/samba/stable/${SAMBA}
     fi
 
     tar xvzf samba-*.tar.gz
+    DIR=`ls -l | grep d | awk '{print $9}' | grep ^samba`
     build_sh
-    mv build.sh `ls -l | grep d | awk '{print $9}' | grep ^samba`/
-    chmod +x `ls -l | grep d | awk '{print $9}' | grep ^samba`/build.sh
-    echo "run ./build.sh && exit"    
-    cd `ls -l | grep d | awk '{print $9}' | grep ^samba`
-    $SHELL
-
-    echo "Fill up realm UPPERCASE"
-    key    
+    mv build.sh $DIR/
+    chmod +x $DIR/build.sh
+    ./$DIR/build.sh
+    
+    
+    echo "Fill up realm (UPPERCASE)"   
     samba-tool domain provision --use-rfc2307 --interactive
+
+    mv /etc/krb5.conf /etc/krb5.conf.bkp
 
     ACTION="Coping krb5.conf"
     cp /var/lib/samba/private/krb5.conf /etc/krb5.conf > /dev/null 2>&1
     check_errors
 
     service
-    mv samba-ad-dc.service /lib/systemd/system/
-    #ln -s /lib/systemd/system/samba-ad-dc.service /etc/systemd/system/samba-ad-dc.service
+    if [ $DISTRO = "centos"]
+    then
+        chcon -R -t bin_t /usr/sbin 2> /dev/null
+        mv samba-ad-dc.service /etc/systemd/system/samba-ad-dc.service
+    else
+        mv samba-ad-dc.service /lib/systemd/system/
+    fi
 
     ACTION="Daemon reload"
     systemctl daemon-reload > /dev/null 2>&1
+    check_errors
+
+    ACTION="Samba enable"
+    systemctl enable samba-ad-dc > /dev/null 2>&1
     check_errors
 
     ACTION="Samba unmask"
@@ -273,46 +318,87 @@ build(){
     check_errors
 
 
-    ACTION="Samba enable"
-    systemctl enable samba-ad-dc > /dev/null 2>&1
-    check_errors
-
-    
+        
 }
 
 
 
 package(){
-    case $DISTRO in
-        ubuntu)
-            apt-get install -y acl attr samba samba-dsdb-modules samba-vfs-modules winbind libpam-winbind libnss-winbind krb5-config krb5-user dnsutils
-            ;;
-        debian)
-            apt-get install -y acl attr samba samba-dsdb-modules samba-vfs-modules winbind libpam-winbind libnss-winbind krb5-config krb5-user dnsutils
-            ;;
-        opensuse)
-            zypper install -y samba samba-winbind samba-ad-dc
-            ;;
-        *)
-            echo "Would you like to install freeBSD samba-ad packages?"
-            read ANSWER
-            yes_or_no $ANSWER
-            if [[ "$?" = '1' ]]; then
-                pkg install net/samba44
-            else
-                echo "Red Hat does not provide packages for running Samba as an AD DC. As an alternative build samba-ad"
-                build
-            fi
-            ;;
-    esac
-
+    DISTRO_NOT_FOUND="true"
+    while [ $DISTRO_NOT_FOUND = "true" ]
+    do
+        case $DISTRO in
+            ubuntu)
+                ACTION="Ubuntu package install"
+                apt-get install -y acl attr samba samba-dsdb-modules samba-vfs-modules winbind libpam-winbind libnss-winbind krb5-config krb5-user dnsutils > /dev/null 2>&1
+                check_errors
+                DISTRO_NOT_FOUND="false"
+                ;;
+            debian)
+                ACTION="Debian package install"
+                apt-get install -y acl attr samba samba-dsdb-modules samba-vfs-modules winbind libpam-winbind libnss-winbind krb5-config krb5-user dnsutils > /dev/null 2>&1
+                check_errors
+                DISTRO_NOT_FOUND="false"
+                ;;
+            opensuse)
+                ACTION="OpenSUSE package install"
+                zypper install -y samba samba-winbind samba-ad-dc > /dev/null 2>&1
+                check_errors
+                DISTRO_NOT_FOUND="false"
+                ;;
+            fedora)
+                ACTION="Fedora/feeBSD package install"
+                pkg install net/samba44 > /dev/null 2>&1
+                check_errors
+                DISTRO_NOT_FOUND="false"
+                ;;
+            *)
+                echo "Package for you distro not found" 
+                echo "Red Hat does not provide packages for running Samba as an AD DC. As an alternative build samba-ad"      
+                echo -n "Which distro package would you like to install?
+                1 - Ubuntu
+                2 - Debian
+                3 - OpenSUSE
+                4 - Fedora/freeBSD
+                5 - Install no package, build instead
+                6 - Exit
+                Option: "
+                read OPT
+                case $OPT in
+                    1)
+                        DISTRO="ubuntu"
+                        ;;
+                    2)
+                        DISTRO="debian"
+                        ;;
+                    3)
+                        DISTRO="opensuse"
+                        ;;
+                    4)
+                        DISTRO="fedora"
+                        ;;
+                    5)
+                        build
+                        DISTRO_NOT_FOUND="true"
+                        ;;
+                    6)
+                        exit
+                        ;;
+                    *)
+                        echo "Not a valid option, chose between 1 and 6"
+                        ;;
+                esac
+                ;;
+        esac
+    done
     ACTION="Preparing the installation"
     mv /etc/samba/smb.conf /etc/samba/smb.conf.bkp > /dev/null 2>&1
     check_errors
 
-    echo "Fill up realm UPPERCASE"
-    key    
+    echo "Fill up realm (UPPERCASE)"   
     samba-tool domain provision --use-rfc2307 --interactive
+    
+    mv /etc/krb5.conf /etc/krb5.conf.bkp
 
     ACTION="Coping krb5.conf"
     cp /var/lib/samba/private/krb5.conf /etc/krb5.conf > /dev/null 2>&1
@@ -335,12 +421,13 @@ package(){
 
 
 #beginning
-
-yum install redhat-lsb-core &> /dev/null 
 export LANG=en_US.UTF8
 export LC_ALL=en_US.UTF8
+yum install -y redhat-lsb-core 2> /dev/null
+zypper --non-interactive install lsb-release 2> /dev/null
 
-DISTRO=$(lsb_release -si | tr [:upper:] [:lower:])
+
+DISTRO=$(lsb_release -sd | sed 's/"//g' | tr [:upper:] [:lower:] | awk '{print $1}')
 VERSION=$(lsb_release -sr | sed 's/\.//g')
 DISTROVERSION=$DISTRO$VERSION
 
@@ -354,14 +441,15 @@ package_or_build
 echo "Would you like to update hosts, hostname and resolv.conf now?"
 read ANSWER
 yes_or_no $ANSWER
-if [[ "$?" = '0' ]]; then
-    echo "ok"
-else
+if [ "$?" = '1' ]
+then
     prepare
+else
+    echo "ok"
 fi
 
 echo "Finished, rebooting, run samba2.sh after reboot"
 echo "bye"
 key
 
-reboot
+systemctl reboot

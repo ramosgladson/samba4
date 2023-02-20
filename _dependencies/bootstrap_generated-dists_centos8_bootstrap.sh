@@ -13,9 +13,9 @@ yum install -y epel-release
 
 yum -v repolist all
 yum config-manager --set-enabled PowerTools -y || \
-    yum config-manager --set-enabled powertools -y
+yum config-manager --set-enabled powertools -y || \
 yum config-manager --set-enabled Devel -y || \
-    yum config-manager --set-enabled devel -y
+yum config-manager --set-enabled devel -y
 yum update -y
 
 yum install -y \

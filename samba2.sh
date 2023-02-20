@@ -1,3 +1,14 @@
+#!/bin/bash
+
+############################################################################
+#title          :samba2 SCRIPT
+#description    :Thir SCRIPT will prepair samba4 domain controller
+#author         :Gladson Carneiro Ramos
+#date           :2023-02-20
+#version        :2.0
+#usage          :bash samba2.sh
+############################################################################
+
 
 key(){
     echo "Press any key to continue"
@@ -5,7 +16,8 @@ key(){
 }
 
 check_errors() {
-	if [ $? -ne 0 ] ; then
+	if [ $? -ne 0 ]
+	then
 		echo "[FAIL] - $ACTION"
 		exit
 	else
@@ -32,4 +44,4 @@ check_errors
 echo "Finished, rebooting"
 key
 
-reboot
+systemctl reboot
