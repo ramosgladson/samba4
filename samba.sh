@@ -4,15 +4,33 @@
 #title          :samba SCRIPT
 #description    :Thir SCRIPT will prepair samba4 domain controller
 #author         :Gladson Carneiro Ramos
-#date           :2023-02-20
-#version        :2.0
+#date           :2023-02-21
+#version        :2.1
 #usage          :bash samba.sh
 ############################################################################
+
+
+netplan_conf(){
+cat << EOF > `ls /etc/netplan/0*`
+network:
+  ethernets:
+    ens18:
+      addresses:
+      - $IP/24
+      gateway4: $GATEWAY
+      nameservers:
+        addresses:
+        - $IP
+        search:
+        - $REALM
+  version: 2
+EOF
+}
 
 build_sh(){
 cat << EOF > build.sh
 #!/bin/bash
-cd "${0%/*}"
+cd "\${0%/*}"
 
 ./configure --prefix /usr --enable-fhs --enable-cups --sysconfdir=/etc --localstatedir=/var \
 --with-privatedir=/var/lib/samba/private --with-piddir=/var/run/samba --with-automount \
@@ -27,8 +45,17 @@ ldconfig
 EOF
 }
 
+resolv(){
+cat << EOF > /etc/resolv.conf
+nameserver $IP
+search $REALM
+
+EOF
+}
+
+
 service(){
-cat << EOF > samba-ad-dc.service
+cat << EOF > /etc/systemd/system/samba-ad-dc.service
 [Unit]
 Description=Samba Active Directory Domain Controller
 After=network.target remote-fs.target nss-lookup.target
@@ -47,29 +74,29 @@ EOF
 prepare(){
     
     IP=`ip -4 addr show scope global | grep inet | awk '{print $2}' | cut -d / -f 1`
-    INTERFACE=`ip -4 addr show scope global | grep -i broadcast | awk '{print $2}' | sed 's/://'` 
+    INTERFACE=`ip -4 addr show scope global | grep -i broadcast | awk '{print $2}' | sed 's/://'`
     echo "What is your realm (lowercase)"
     read REALM
-    if [ $DISTRO = "ubuntu" ] || [ $DISTRO = "debian" ]
-    then
-        systemctl unmask systemd-resolved
-        systemctl enable systemd-resolved        
-        systemctl restart systemd-resolved
-
-        ACTION="Updating /etc/resolv.conf"
-        systemd-resolve --interface $INTERFACE --set-dns $IP --set-domain $REALM &> /dev/null
-        check_errors
-    else
-        ACTION="Updating nameserver"
-        nmcli con mod $INTERFACE IPv4.dns $IP &> /dev/null
-        check_errors
-
-        ACTION="Updating search domain"
-        nmcli con mod $INTERFACE IPv4.dns-search $REALM &> /dev/null
-        check_errors
-
-        nmcli con down $INTERFACE && nmcli con up $INTERFACE
-    fi
+    case $DISTRO in
+        ubuntu)
+            echo "Type your network gateway"
+            read GATEWAY
+            netplan_conf
+            netplan apply
+            ;;
+        debian)
+            mv /etc/resolv.conf /etc/resolv.conf.bkp
+            resolv          
+            ;;
+        centos)
+            nmcli con mod $INTERFACE IPv4.method manual
+            nmcli con mod $INTERFACE IPv4.dns $IP IPv4.dns-search $REALM
+            nmcli con down $INTERFACE && nmcli con up $INTERFACE            
+            ;;
+        *)
+            echo "configurar resolv.conf"
+            ;;
+    esac
     echo "$IP $NAME.$REALM $NAME" >> /etc/hosts
 }
 
@@ -297,12 +324,11 @@ build(){
     check_errors
 
     service
-    if [ $DISTRO = "centos"]
+    if [ $DISTRO = 'centos' ]
     then
         chcon -R -t bin_t /usr/sbin 2> /dev/null
-        mv samba-ad-dc.service /etc/systemd/system/samba-ad-dc.service
-    else
-        mv samba-ad-dc.service /lib/systemd/system/
+    #else
+        #exitmv /etc/systemd/system/samba-ad-dc.service /lib/systemd/system/
     fi
 
     ACTION="Daemon reload"
@@ -316,107 +342,100 @@ build(){
     ACTION="Samba unmask"
     systemctl unmask samba-ad-dc > /dev/null 2>&1
     check_errors
-
-
-        
+       
 }
 
 
 
 package(){
-    DISTRO_NOT_FOUND="true"
-    while [ $DISTRO_NOT_FOUND = "true" ]
-    do
-        case $DISTRO in
-            ubuntu)
-                ACTION="Ubuntu package install"
-                apt-get install -y acl attr samba samba-dsdb-modules samba-vfs-modules winbind libpam-winbind libnss-winbind krb5-config krb5-user dnsutils > /dev/null 2>&1
-                check_errors
-                DISTRO_NOT_FOUND="false"
-                ;;
-            debian)
-                ACTION="Debian package install"
-                apt-get install -y acl attr samba samba-dsdb-modules samba-vfs-modules winbind libpam-winbind libnss-winbind krb5-config krb5-user dnsutils > /dev/null 2>&1
-                check_errors
-                DISTRO_NOT_FOUND="false"
-                ;;
-            opensuse)
-                ACTION="OpenSUSE package install"
-                zypper install -y samba samba-winbind samba-ad-dc > /dev/null 2>&1
-                check_errors
-                DISTRO_NOT_FOUND="false"
-                ;;
-            fedora)
-                ACTION="Fedora/feeBSD package install"
-                pkg install net/samba44 > /dev/null 2>&1
-                check_errors
-                DISTRO_NOT_FOUND="false"
-                ;;
-            *)
-                echo "Package for you distro not found" 
-                echo "Red Hat does not provide packages for running Samba as an AD DC. As an alternative build samba-ad"      
-                echo -n "Which distro package would you like to install?
-                1 - Ubuntu
-                2 - Debian
-                3 - OpenSUSE
-                4 - Fedora/freeBSD
-                5 - Install no package, build instead
-                6 - Exit
-                Option: "
-                read OPT
-                case $OPT in
-                    1)
-                        DISTRO="ubuntu"
-                        ;;
-                    2)
-                        DISTRO="debian"
-                        ;;
-                    3)
-                        DISTRO="opensuse"
-                        ;;
-                    4)
-                        DISTRO="fedora"
-                        ;;
-                    5)
-                        build
-                        DISTRO_NOT_FOUND="true"
-                        ;;
-                    6)
-                        exit
-                        ;;
-                    *)
-                        echo "Not a valid option, chose between 1 and 6"
-                        ;;
-                esac
-                ;;
-        esac
-    done
-    ACTION="Preparing the installation"
-    mv /etc/samba/smb.conf /etc/samba/smb.conf.bkp > /dev/null 2>&1
-    check_errors
+    PACK="true"
+    case $DISTRO in
+        ubuntu)
+            ACTION="Ubuntu package install"
+            apt-get install -y acl attr samba samba-dsdb-modules samba-vfs-modules winbind libpam-winbind libnss-winbind krb5-config krb5-user dnsutils > /dev/null 2>&1
+            check_errors
+            ;;
+        debian)
+            ACTION="Debian package install"
+            apt-get install -y acl attr samba samba-dsdb-modules samba-vfs-modules winbind libpam-winbind libnss-winbind krb5-config krb5-user dnsutils > /dev/null 2>&1
+            check_errors
+            ;;
+        opensuse)
+            ACTION="OpenSUSE package install"
+            zypper install -y samba samba-winbind samba-ad-dc > /dev/null 2>&1
+            check_errors
+            ;;
+        fedora)
+            ACTION="Fedora/feeBSD package install"
+            pkg install net/samba44 > /dev/null 2>&1
+            check_errors
+            ;;
+        *)
+            echo "Package for you distro not found" 
+            echo "Red Hat does not provide packages for running Samba as an AD DC. As an alternative build samba-ad"      
+            echo -n "Which distro package would you like to install?
+            1 - Ubuntu
+            2 - Debian
+            3 - OpenSUSE
+            4 - Fedora/freeBSD
+            5 - Install no package, build instead
+            6 - Exit
+            Option: "
+            read OPT
+            case $OPT in
+                1)
+                    DISTRO="ubuntu"
+                    ;;
+                2)
+                    DISTRO="debian"
+                    ;;
+                3)
+                    DISTRO="opensuse"
+                    ;;
+                4)
+                    DISTRO="fedora"
+                    ;;
+                5)
+                    build
+                    PACK="false"
+                    ;;
+                6)
+                    exit
+                    ;;
+                *)
+                    echo "Not a valid option, chose between 1 and 6"
+                    package
+                    ;;
+            esac
+            ;;
+    esac
+    if [ $PACK = "true" ]
+    then
+        ACTION="Preparing the installation"
+        mv /etc/samba/smb.conf /etc/samba/smb.conf.bkp > /dev/null 2>&1
+        check_errors
 
-    echo "Fill up realm (UPPERCASE)"   
-    samba-tool domain provision --use-rfc2307 --interactive
-    
-    mv /etc/krb5.conf /etc/krb5.conf.bkp
+        echo "Fill up realm (UPPERCASE)"   
+        samba-tool domain provision --use-rfc2307 --interactive
+        
+        mv /etc/krb5.conf /etc/krb5.conf.bkp
 
-    ACTION="Coping krb5.conf"
-    cp /var/lib/samba/private/krb5.conf /etc/krb5.conf > /dev/null 2>&1
-    check_errors
+        ACTION="Coping krb5.conf"
+        cp /var/lib/samba/private/krb5.conf /etc/krb5.conf > /dev/null 2>&1
+        check_errors
 
-    ACTION="Daemon reload"
-    systemctl daemon-reload > /dev/null 2>&1
-    check_errors
+        ACTION="Daemon reload"
+        systemctl daemon-reload > /dev/null 2>&1
+        check_errors
 
-    ACTION="Samba unmask"
-    systemctl unmask samba-ad-dc > /dev/null 2>&1
-    check_errors
+        ACTION="Samba unmask"
+        systemctl unmask samba-ad-dc > /dev/null 2>&1
+        check_errors
 
-    ACTION="Samba enable"
-    systemctl enable samba-ad-dc > /dev/null 2>&1
-    check_errors
-
-
+        ACTION="Samba enable"
+        systemctl enable samba-ad-dc > /dev/null 2>&1
+        check_errors
+    fi
 }
 
 

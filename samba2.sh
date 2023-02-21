@@ -4,8 +4,8 @@
 #title          :samba2 SCRIPT
 #description    :Thir SCRIPT will prepair samba4 domain controller
 #author         :Gladson Carneiro Ramos
-#date           :2023-02-20
-#version        :2.0
+#date           :2023-02-21
+#version        :2.1
 #usage          :bash samba2.sh
 ############################################################################
 
@@ -24,6 +24,10 @@ check_errors() {
 		echo "[OK] - $ACTION"
 	fi
 }
+systemctl disable samba-ad-dc
+systemctl unmask samba-ad-dc
+systemctl enable samba-ad-dc
+systemctl restart samba-ad-dc
 
 AD_DC_IP=`ip -4 addr show scope global | grep inet | awk '{print $2}' | cut -d / -f 1`
 IFS='.' read -r -a ADDR <<< "$IP"
