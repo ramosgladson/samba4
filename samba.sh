@@ -4,8 +4,8 @@
 #title          :samba SCRIPT
 #description    :Thir SCRIPT will prepair samba4 domain controller
 #author         :Gladson Carneiro Ramos
-#date           :2023-02-21
-#version        :2.1
+#date           :2023-02-22
+#version        :2.2
 #usage          :bash samba.sh
 ############################################################################
 
@@ -326,9 +326,7 @@ build(){
     service
     if [ $DISTRO = 'centos' ]
     then
-        chcon -R -t bin_t /usr/sbin 2> /dev/null
-    #else
-        #exitmv /etc/systemd/system/samba-ad-dc.service /lib/systemd/system/
+        chcon -u system_u -r object_r -t bin_t /usr/sbin/samba* 
     fi
 
     ACTION="Daemon reload"
