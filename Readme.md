@@ -266,10 +266,10 @@ Valid starting       Expires              Service principal
 24.09.2015 19:56:55  25.09.2015 05:56:55  krbtgt/SAMDOM.EXAMPLE.COM@SAMDOM.EXAMPLE.COM
 	renew until 25.09.2015 19:56:53
 ```
-## [Time Synchronisation]:[time-sync]
+## [Time Synchronisation][time-sync]
 -Synchronize time linux
 
-## [Join Domain]:[join]
+## [Join Domain][join]
 ```
 samba-tool domain join my.local DC --option="dns forwarder=8.8.8.8" --dns-backend=SAMBA_INTERNAL --option='idmap_ldb:use rfc2307 = yes' --option="interfaces=lo ens18"
 ```
