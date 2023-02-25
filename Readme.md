@@ -146,7 +146,15 @@ or
 ```
 samba-tool domain provision --use-rfc2307 --realm=MY.LOCAL.DOMAIN --domain=my \
 --server-role=dc --dns-backend=SAMBA_INTERNAL --adminpass=P@ssw0rd
+
 ```
+
+### Setting winbind
+>Add the following parameters to the [global] section of your smb.conf file:
+
+template shell = /bin/bash
+template homedir = /home/%U
+
 ### Kerberos config
 
 ```
@@ -203,7 +211,13 @@ Password for [administrator@SAMDOM.EXAMPLE.COM]:
 Zone 0.168.192.in-addr.arpa created successfully
 ```
 
-## [Verifying DC DNS Record][dns-rec]
+## Kerberos
+```
+kinit Administrator
+klist
+```
+
+## Verifying DC [DNS Record][dns-rec]
 ```
 smbclient -L localhost -U Administrator
 smbclient //localhost/netlogon -UAdministrator -c 'ls'
@@ -225,7 +239,6 @@ cd samba4
 # Joining a Samba DC to an Existing Active Directory
 - Check for [file system support][samba4-fss]
 - install operating system
-- Choose a domain name
 - Add to /etc/hosts
 - Install [packages dependencies][samba4-dep]
 - Install [Distribution-specific Package][samba4-pac]
@@ -233,7 +246,6 @@ cd samba4
 
 ## Set nameservers to ad1 and localhost ip
 >vim /etc/resolv.conf
-
 ```
 nameserver 192.168.0.11
 nameserver 192.168.0.12
@@ -242,13 +254,23 @@ search my.local
 
 ## Samba service
 ```
-systemctl stop samba-ad-dc
+systemctl stop smbd
 ```
 
 ## Backup smb.conf
 ```
 # mv /etc/samba/smb.conf /etc/samba/smb.conf.bkp
 ```
+## Centos prepare
+```
+yum install krb5-libs krb5-server krb5-workstation
+```
+
+## Kerberos config
+```
+cp /var/lib/samba/private/krb5.conf /etc/krb5.conf
+```
+Copy /etc/krb5-conf from domain controller to new server
 
 ## To verify the settings use the kinit command to request a Kerberos ticket for the domain administrator:
 ```
@@ -273,7 +295,23 @@ Valid starting       Expires              Service principal
 ```
 samba-tool domain join my.local DC --option="dns forwarder=8.8.8.8" --dns-backend=SAMBA_INTERNAL --option='idmap_ldb:use rfc2307 = yes' --option="interfaces=lo ens18"
 ```
+### Setting winbind
+>on both controllers, add the following parameters to the [global] section of your smb.conf file:
 
+template shell = /bin/bash
+template homedir = /home/%U
+
+
+## Sysvol replication
+>use [rsync][rsync] with super server xinetd
+
+## Set nameservers on your first controller to both controllers
+>vim /etc/resolv.conf
+```
+nameserver 192.168.0.11
+nameserver 192.168.0.12
+search my.local
+```
 
 <!-- Mardown Links -->
 [samba4-doc]: https://wiki.samba.org/index.php/Main_Page
@@ -283,6 +321,7 @@ samba-tool domain join my.local DC --option="dns forwarder=8.8.8.8" --dns-backen
 [samba4-source]: https://wiki.samba.org/index.php/Build_Samba_from_Source
 [samba4-fss]: https://wiki.samba.org/index.php/File_System_Support
 [time-sync]: https://wiki.samba.org/index.php/Time_Synchronisation
+[rsync]: https://wiki.samba.org/index.php/Rsync_based_SysVol_replication_workaround
 [dns-rec]: https://wiki.samba.org/index.php/Verifying_and_Creating_a_DC_DNS_Record
 [join]: https://wiki.samba.org/index.php/Joining_a_Samba_DC_to_an_Existing_Active_Directory#Joining_the_Active_Directory_as_a_Domain_Controllerhttps://wiki.samba.org/index.php/Joining_a_Samba_DC_to_an_Existing_Active_Directory#Joining_the_Active_Directory_as_a_Domain_Controller
 [realm]: /_images/realm.png
