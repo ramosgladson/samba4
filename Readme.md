@@ -151,10 +151,10 @@ samba-tool domain provision --use-rfc2307 --realm=MY.LOCAL.DOMAIN --domain=my \
 
 ### Setting winbind
 >Add the following parameters to the [global] section of your smb.conf file:
-
+```
 template shell = /bin/bash
 template homedir = /home/%U
-
+```
 ### Kerberos config
 
 ```
@@ -192,10 +192,11 @@ systemctl unmask samba-ad-dc
 systemctl enable samba-ad-dc
 systemctl restart samba-ad-dc
 ```
+
+### Resolv.conf
 * Change search (your.realm) and nameserver at /etc/resolv.conf to your local host ip
 * add your host ip at /etc/hosts
 
-### Resolv.conf
 /etc/resolv.conf
 ```
 nameserver 192.168.0.11 //server ip
@@ -267,9 +268,7 @@ yum install krb5-libs krb5-server krb5-workstation
 ```
 
 ## Kerberos config
-```
-cp /var/lib/samba/private/krb5.conf /etc/krb5.conf
-```
+
 Copy /etc/krb5-conf from domain controller to new server
 
 ## To verify the settings use the kinit command to request a Kerberos ticket for the domain administrator:
@@ -297,10 +296,10 @@ samba-tool domain join my.local DC --option="dns forwarder=8.8.8.8" --dns-backen
 ```
 ### Setting winbind
 >on both controllers, add the following parameters to the [global] section of your smb.conf file:
-
+```
 template shell = /bin/bash
 template homedir = /home/%U
-
+```
 
 ## Sysvol replication
 >use [rsync][rsync] with super server xinetd
